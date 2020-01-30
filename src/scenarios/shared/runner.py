@@ -14,9 +14,8 @@ from shared import const
 from performance.logger import setup_loggers
 
 
-reqfields = ('scenarioname',
-             'exename',
-             )
+reqfields = ('exename',
+            )
 optfields = ('guiapp',
              'startupmetric',
              'appargs',
@@ -27,6 +26,8 @@ optfields = ('guiapp',
              'workingdir',
              'iterationsetup',
              'setupargs',
+             'iterationcleanup',
+             'cleanupargs',
              'processwillexit',
              'measurementdelay'
              )
@@ -49,6 +50,7 @@ class Runner:
         self.traits = traits
         self.testtype = None
         self.sdktype = None
+        self.scenarioname = None
         setup_loggers(True)
 
     def parseargs(self):
@@ -58,8 +60,11 @@ class Runner:
         parser = ArgumentParser()
         subparsers = parser.add_subparsers(title='subcommands for sdk tests', required=True, dest='testtype')
         startupparser = subparsers.add_parser(const.STARTUP)
+        self.add_common_arguments(startupparser)
+
         sdkparser = subparsers.add_parser(const.SDK)
         sdkparser.add_argument('sdktype', choices=[const.CLEAN_BUILD, const.BUILD_NO_CHANGE], type=str.lower)
+        self.add_common_arguments(sdkparser)
 
         args = parser.parse_args()
 
@@ -70,6 +75,13 @@ class Runner:
 
         if self.testtype == const.SDK:
             self.sdktype = args.sdktype
+        if args.scenarioname:
+            self.scenarioname = args.scenarioname
+    
+    def add_common_arguments(self, parser: ArgumentParser):
+        "Common arguments to add to subparsers"
+        parser.add_argument('--scenario-name',
+                            dest='scenarioname')
 
     def run(self):
         '''
@@ -79,6 +91,7 @@ class Runner:
         if self.testtype == const.STARTUP:
             startup = StartupWrapper()
             startup.runtests(**self.traits._asdict(),
+                             scenarioname=self.scenarioname,
                              scenariotypename=const.SCENARIO_NAMES[const.STARTUP],
                              apptorun=publishedexe(self.traits.exename))
         elif self.testtype == const.SDK:
@@ -87,7 +100,7 @@ class Runner:
             envlistcleanbuild= ';'.join(['MSBUILDDISABLENODEREUSE=1', envlistbuild])
             # clean build
             if self.sdktype == const.CLEAN_BUILD:
-                startup.runtests(scenarioname=self.traits.scenarioname,
+                startup.runtests(scenarioname=self.scenarioname,
                                 exename=self.traits.exename,
                                 guiapp=self.traits.guiapp,
                                 startupmetric=const.STARTUP_PROCESSTIME,
@@ -98,15 +111,17 @@ class Runner:
                                 scenariotypename='%s_%s' % (const.SCENARIO_NAMES[const.SDK], const.CLEAN_BUILD),
                                 apptorun=const.DOTNET,
                                 iterationsetup='py' if sys.platform == 'win32' else 'py3',
-                                setupargs='-3 %s' % const.ITERATION_SETUP_FILE if sys.platform == 'win32' else const.ITERATION_SETUP_FILE,
-                                workingdir=const.TMPDIR,
+                                setupargs='-3 %s setup' % const.ITERATION_SETUP_FILE if sys.platform == 'win32' else const.ITERATION_SETUP_FILE,
+                                iterationcleanup='py' if sys.platform == 'win32' else 'py3',
+                                cleanupargs='-3 %s cleanup' % const.ITERATION_SETUP_FILE if sys.platform == 'win32' else const.ITERATION_SETUP_FILE,
+                                workingdir= const.APPDIR if not self.traits.workingdir else os.path.join(const.APPDIR, self.traits.workingdir),
                                 environmentvariables=envlistcleanbuild,
                                 processwillexit=self.traits.processwillexit,
                                 measurementdelay=self.traits.measurementdelay
                              )
             # build(no changes)
             if self.sdktype == const.BUILD_NO_CHANGE:
-                startup.runtests(scenarioname=self.traits.scenarioname,
+                startup.runtests(scenarioname=self.scenarioname,
                                 exename=self.traits.exename,
                                 guiapp=self.traits.guiapp,
                                 startupmetric=const.STARTUP_PROCESSTIME,
@@ -118,7 +133,9 @@ class Runner:
                                 apptorun=const.DOTNET,
                                 iterationsetup=None,
                                 setupargs=None,
-                                workingdir=const.TMPDIR,
+                                iterationcleanup=None,
+                                cleanupargs=None,
+                                workingdir= const.APPDIR if not self.traits.workingdir else os.path.join(const.APPDIR, self.traits.workingdir),
                                 environmentvariables=envlistbuild,
                                 processwillexit=self.traits.processwillexit,
                                 measurementdelay=self.traits.measurementdelay
