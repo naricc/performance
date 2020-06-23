@@ -134,11 +134,17 @@ def run_single_test(built: Built, t: SingleTest, out: TestPaths) -> None:
         min_seconds = option_or_3(
             t.benchmark.min_seconds, t.options.default_min_seconds, _TEST_MIN_SECONDS_DEFAULT
         )
+
         if seconds_taken < min_seconds:
             desc = f"coreclr={t.coreclr_name} config={t.config_name} benchmark={t.benchmark_name}"
-            raise Exception(
-                f"{desc} took {seconds_taken} seconds, minimum is {min_seconds}"
-                "(you could change the benchmark's min_seconds or options.default_min_seconds)"
+            min_secs_origin = (
+                "yaml file"
+                if min_seconds in (t.benchmark.min_seconds, t.options.default_min_seconds)
+                else "default"
+            )
+            print(
+                f"\n*WARNING*: Test '{desc}' took {seconds_taken} seconds "
+                f"and {min_secs_origin} minimum set is {min_seconds}.\n"
             )
     else:
         print("Test failed, continuing...")
@@ -367,7 +373,7 @@ def _run_single_test_windows_perfview(
     mem_load = t.config.memory_load
     mem_load_process = None
     if mem_load is not None:
-        print("setting up memory load...")
+        print("\nSetting up memory load...")
         mem_load_args: Sequence[str] = (
             str(built.win.make_memory_load),
             "-percent",
@@ -376,12 +382,21 @@ def _run_single_test_windows_perfview(
         )
         mem_load_process = Popen(args=mem_load_args, stderr=PIPE)
         assert mem_load_process.stderr is not None
+
         # Wait on it to start up
-        line = decode_stdout(mem_load_process.stderr.readline())
-        assert (
-            line == "make_memory_load finished starting up"
-        ), f"Unexpected make_memory_load output {line}"
-        print("done")
+        mem_load_msg = decode_stdout(mem_load_process.stderr.readline()).split(",")
+
+        if len(mem_load_msg) == 2 and mem_load_msg[0].startswith("threshold"):
+            print(
+                f"\n*WARNING*: Desired memory load was {mem_load.percent}%, "
+                f"but {mem_load_msg[1]}% was achieved. There might be some "
+                f"slight variations in the resulting traces.\n"
+            )
+        elif mem_load_msg[0] == "make_memory_load finished starting up":
+            print(f"Done!\n")
+        else:
+            mem_load_process.kill()
+            assert False, f"\nError in make_memory_load: {mem_load_msg[0]}\n"
 
     log_file = out.add_ext("perfview-log.txt")
     trace_file = out.add_ext("etl")

@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from os.path import getmtime
 from pathlib import Path
-from platform import processor
+from platform import machine, processor
 from shutil import copyfile, copytree
 from typing import Mapping, Optional, Sequence
 
@@ -51,21 +51,23 @@ def _get_os_name() -> str:
 
 
 def is_arm() -> bool:
-    return processor().startswith("ARM")
+    return machine().find("ARM") != -1
 
 
-def _get_platform_name() -> str:
+def get_platform_name() -> str:
     if is_arm():
-        # TODO: detect arm32 vs 64
-        return "arm64"
+        # On ARM, the machine() function returns the exact name we need here.
+        return machine().lower()
     else:
         p = processor()
-        assert any(x in p for x in ("AMD64", "Intel64", "x86_64"))
+        assert any(
+            x in p for x in ("AMD64", "Intel64", "x86_64")
+        ), f"Processor {p} is not supported."
         return "x64"
 
 
 def get_built_tests_dir(coreclr_repository_root: Path, debug: bool) -> Path:
-    os_dir = f"{_get_os_name()}.{_get_platform_name()}"
+    os_dir = f"{_get_os_name()}.{get_platform_name()}"
     r = "Debug" if debug else "Release"
     return coreclr_repository_root / "bin" / "tests" / f"{os_dir}.{r}"
 
@@ -108,7 +110,9 @@ class Built:
 
     @property
     def win(self) -> BuiltWindowsOnly:
-        assert os_is_windows()
+        # Visual Studio tools are not supported on ARM. Hence, we assert we are
+        # not working on said architecture.
+        assert os_is_windows() and not is_arm()
         return non_null(self._win)
 
 
@@ -218,10 +222,22 @@ def get_built_gcperf() -> Sequence[Path]:
     return [assert_file_exists(p) for p in (gcperf_dll_path, traceevent_dll_path)]
 
 
+def _get_latest_testbin_path(test_name: str) -> Path:
+    base_bin_path = _ARTIFACTS_BIN_PATH / test_name / "release"
+    bin_build_dirs = [
+        str(f.absolute()).split("\\")[-1]
+        for f in base_bin_path.iterdir()
+        if f.is_dir() and "netcoreapp" in str(f)
+    ]
+
+    bin_versions = list(map(lambda d: float(d.split("netcoreapp")[-1]), bin_build_dirs))
+    return base_bin_path / f"netcoreapp{bin_versions[-1]}" / f"{test_name}.dll"
+
+
 def _get_built_test(name: str, build_kind: BuildKind) -> Path:
     # Apparently, built files go to the root of the performance repo instead of next to the source.
     test_dir = _get_test_path(name)
-    out_path = _ARTIFACTS_BIN_PATH / name / "release" / "netcoreapp3.0" / f"{name}.dll"
+    out_path = _get_latest_testbin_path(name)
     test_cs = test_dir / f"{name}.cs"
     assert_file_exists(test_cs)
     msg = _is_build_is_out_of_date(_get_cs_files(test_dir), out_path, build_kind)
@@ -360,7 +376,7 @@ def _get_debug_or_release(debug_kind: _DebugKind) -> str:
 
 def _get_debug_or_release_dir_name(debug_kind: _DebugKind) -> str:
     return (
-        f"{_get_os_name()}.{_get_platform_name()}.{_get_debug_or_release(debug_kind).capitalize()}"
+        f"{_get_os_name()}.{get_platform_name()}.{_get_debug_or_release(debug_kind).capitalize()}"
     )
 
 
@@ -383,7 +399,7 @@ def _get_core_root(runtime_repository: Path, debug_kind: _DebugKind) -> Path:
 
 def _do_rebuild_coreclr(runtime_repository: Path, just_copy: bool, debug_kind: _DebugKind) -> None:
     coreclr = _get_coreclr_from_runtime(runtime_repository)
-    plat = _get_platform_name()
+    plat = get_platform_name()
     assert_dir_exists(coreclr)
     debug_release = _get_debug_or_release_dir_name(debug_kind)
     if not just_copy:
@@ -557,7 +573,9 @@ def get_built(
         for name, spec in coreclrs.items()
     }
 
-    # Note: not building gcperf here becuase we already did that when setting up CLR imports
+    # Note: not building gcperf here because we already did that when setting
+    # up CLR imports. Also, these scripts are not built on ARM because Visual
+    # Studio tools are not supported there. Therefore, we just skip in this case.
 
     win = (
         BuiltWindowsOnly(
@@ -566,7 +584,7 @@ def get_built(
             make_memory_load=_get_built_c_script("make_memory_load"),
             run_in_job_exe=_get_built_c_script("run_in_job"),
         )
-        if os_is_windows()
+        if os_is_windows() and not is_arm()
         else None
     )
 

@@ -52,11 +52,35 @@ namespace System.Tests
 
         [Benchmark]
         [ArgumentsSource(nameof(Char_ChangeCase_MemberData))]
-        public char Char_ToLower(char c, CultureInfo cultureName) => char.ToLower(c, cultureName); // the argument is called "cultureName" instead of "culture" to keep benchmark ID in BenchView, do NOT rename it
+        public char Char_ToLower(char c, CultureInfo cultureName) => char.ToLower(c, cultureName);
 
         [Benchmark]
         [ArgumentsSource(nameof(Char_ChangeCase_MemberData))]
         public char Char_ToUpper(char c, CultureInfo cultureName)=> char.ToUpper(c, cultureName);
+
+        [Benchmark]
+        [Arguments("Hello World!")]
+        public int Char_ToUpperInvariant(string input)
+        {
+            int accum = 0;
+            for (int i = 0; i < input.Length; i++)
+            {
+                accum += char.ToUpperInvariant(input[i]);
+            }
+            return accum;
+        }
+
+        [Benchmark]
+        [Arguments("Hello World!")]
+        public int Char_ToLowerInvariant(string input)
+        {
+            int accum = 0;
+            for (int i = 0; i < input.Length; i++)
+            {
+                accum += char.ToLowerInvariant(input[i]);
+            }
+            return accum;
+        }
 
         [Benchmark]
         [Arguments('.')]

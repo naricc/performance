@@ -11,6 +11,7 @@ from zipfile import ZipFile
 
 from .command import Command, CommandKind, CommandsMapping
 from .config import PERFVIEW_PATH, SIGCHECK64_PATH
+from .get_built import get_platform_name, is_arm
 from .host_info import write_host_info
 from .util import assert_file_exists, ensure_dir, os_is_windows, unlink_if_exists
 
@@ -18,11 +19,20 @@ from .util import assert_file_exists, ensure_dir, os_is_windows, unlink_if_exist
 def setup() -> None:
     if os_is_windows():
         _download_perfview_and_sigcheck()
-    # Need sigcheck to do this
-    write_host_info()
+
+    # Need sigcheck to do this. Also, since the host info tools are not
+    # available on ARM, skip when on said architecture.
+    if not is_arm():
+        write_host_info()
+    else:
+        print(
+            f"Warning: Detected you are working on {get_platform_name().upper()}. "
+            "Don't forget to write `bench/host_info.yaml` or the tests will "
+            "not work."
+        )
 
 
-_PERFVIEW_URL = "https://github.com/microsoft/perfview/releases/download/P2.0.44/PerfView.exe"
+_PERFVIEW_URL = "https://github.com/microsoft/perfview/releases/download/P2.0.52/PerfView.exe"
 _SIGCHECK_URL = "https://download.sysinternals.com/files/Sigcheck.zip"
 _SIGCHECK_ZIP_PATH = SIGCHECK64_PATH.parent / "Sigcheck.zip"
 _SIGCHECK_PARENT_PATH = SIGCHECK64_PATH.parent

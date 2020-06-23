@@ -36,7 +36,7 @@
 
 **This doc explains how to profile local [dotnet/runtime](https://github.com/dotnet/runtime) builds and it's targetted at [dotnet/runtime](https://github.com/dotnet/runtime) repository contributors.**
 
-Before you start any performance investigation, you need to [build](#Build) [dotnet/runtime](https://github.com/dotnet/runtime) in **Release**, create a small [repro](#Repro) app and change the default [project settings](#Project-Settings).
+Before you start any performance investigation, you need to [build](#Build) [dotnet/runtime](https://github.com/dotnet/runtime) in **Release**, create a small [repro](#Repro) app and change the default [project settings](#Project-Settings). If you want to profile a BenchmarkDotNet test (like those in this repo), [BenchmarkDotNet has built-in profiling option](https://github.com/dotnet/performance/blob/master/docs/benchmarkdotnet.md#profiling) to collect trace.  
 
 The next step is to choose the right profiler depending on the OS:
 
@@ -76,7 +76,7 @@ C:\Projects\runtime\artifacts\bin\testhost\netcoreapp5.0-Windows_NT-Release-x64\
 Once you rebuild the part of [dotnet/runtime](https://github.com/dotnet/runtime) you are working on, the appropriate `.dll` gets updated and the next time you run profiler, dotnet|CoreRun is going to use the updated library.
 
 ```cmd
-C:\Projects\runtime\src\libraries\System.Text.RegularExpressions\src> dotnet msbuild /p:ConfigurationGroup=Release
+C:\Projects\runtime\src\libraries\System.Text.RegularExpressions\src> dotnet msbuild /p:Configuration=Release
 ```
 
 ## Repro
@@ -643,7 +643,7 @@ namespace ProfilingDocs
 **Note:** You can just build the repro app on your Windows dev machine and copy the output app to your Linux VM using `scp`.
 
 ```cmd
-scp -r "C:\Users\adsitnik\source\repos\ProfilingDocs\ProfilingDocs\bin\Release\netcoreapp3.0\ProfilingDocs.dll" adsitnik@11.222.33.444:/home/adsitnik/Projects/coreclr/bin/tests/Linux.x64.Release/Tests/Core_Root/ProfilingDocs.dll
+scp -r "C:\Users\adsitnik\source\repos\ProfilingDocs\ProfilingDocs\bin\Release\netcoreapp3.1\ProfilingDocs.dll" adsitnik@11.222.33.444:/home/adsitnik/Projects/coreclr/bin/tests/Linux.x64.Release/Tests/Core_Root/ProfilingDocs.dll
 ```
 
 ## Collecting a Trace

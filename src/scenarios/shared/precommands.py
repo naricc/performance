@@ -5,6 +5,7 @@ Commands and utilities for pre.py scripts
 import sys
 import os
 import shutil
+from logging import getLogger
 from argparse import ArgumentParser
 from dotnet import CSharpProject, CSharpProjFile
 from shared import const
@@ -35,7 +36,6 @@ class PreCommands:
 
         subparsers = parser.add_subparsers(title='Operations', 
                                            description='Common preperation steps for perf tests.',
-                                           required=True,
                                            dest='operation')
 
         default_parser = subparsers.add_parser(DEFAULT, help='Default operation' )
@@ -49,11 +49,16 @@ class PreCommands:
 
         args = parser.parse_args()
 
+        if not args.operation:
+            getLogger().error("Please specify an operation: %s" % list(OPERATIONS))
+            sys.exit(1)
+
         self.configuration = args.configuration 
         self.operation = args.operation
         self.framework = args.framework
-        self.runtime = args.runtime
+        self.runtime_identifier = args.runtime
         self.msbuild = args.msbuild
+        self.msbuildstatic = args.msbuildstatic
 
     def new(self,
             template: str,
@@ -72,6 +77,7 @@ class PreCommands:
                                  verbose=True,
                                  language=language)
         self._updateframework(self.project.csproj_file)
+        self._addstaticmsbuildproperty(self.project.csproj_file)
 
     def add_common_arguments(self, parser: ArgumentParser):
         "Options that are common across many 'dotnet' commands"
@@ -89,6 +95,11 @@ class PreCommands:
                             help='Flags passed through to msbuild',
                             dest='msbuild',
                             metavar='/p:Foo=Bar;/p:Baz=Blee;...')
+        parser.add_argument('--msbuild-static',
+                            help='Properties added to csproj',
+                            dest='msbuildstatic',
+                            metavar='Foo=Bar;Bas=Blee;...'
+                           )
         parser.set_defaults(configuration=RELEASE)
 
     def existing(self, projectdir: str, projectfile: str):
@@ -107,7 +118,8 @@ class PreCommands:
             self._build(configuration=self.configuration, framework=self.framework)
         if self.operation == PUBLISH:
             self._restore()
-            self._publish(self.configuration)
+            self._publish(configuration=self.configuration,
+                          runtime_identifier=self.runtime_identifier)
 
     def add_startup_logging(self, file: str, line: str):
         self.add_event_source(file, line, "PerfLabGenericEventSource.Log.Startup();")
@@ -128,16 +140,24 @@ class PreCommands:
         filepath = os.path.join(projpath, file)
         insert_after(filepath, line, trace_statement)
 
+    def _addstaticmsbuildproperty(self, projectfile: str):
+        if self.msbuildstatic:
+          for propertyarg in self.msbuildstatic.split(';'):
+            propertyname, propertyvalue = propertyarg.split('=')
+            propertystring = f'\n  <PropertyGroup>\n    <{propertyname}>{propertyvalue}</{propertyname}>\n  </PropertyGroup>'
+            insert_after(projectfile, r'</PropertyGroup>', propertystring )
+
     def _updateframework(self, projectfile: str):
         if self.framework:
             replace_line(projectfile, r'<TargetFramework>.*?</TargetFramework>', f'<TargetFramework>{self.framework}</TargetFramework>')
 
-    def _publish(self, configuration: str, framework: str = None):
+    def _publish(self, configuration: str, framework: str = None, runtime_identifier: str = None):
         self.project.publish(configuration=configuration,
                              output_dir=const.PUBDIR, 
                              verbose=True,
-                             packages_path=get_packages_directory(),
-                             target_framework_moniker=framework
+                             packages_path=os.path.join(get_packages_directory(), ''), # blazor publish targets require the trailing slash for joining the paths
+                             target_framework_moniker=framework,
+                             runtime_identifier=runtime_identifier
                              )
 
     def _restore(self):
@@ -147,7 +167,7 @@ class PreCommands:
         self.project.build(configuration=configuration,
                                verbose=True,
                                packages_path=get_packages_directory(),
-                               target_framework_monikers=framework,
+                               target_framework_monikers=[framework],
                                output_to_bindir=True)
 
     def _backup(self, projectdir:str):
@@ -155,3 +175,4 @@ class PreCommands:
         if os.path.isdir(const.APPDIR):
             shutil.rmtree(const.APPDIR)
         shutil.copytree(projectdir, const.APPDIR)
+

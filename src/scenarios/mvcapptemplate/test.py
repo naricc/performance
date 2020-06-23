@@ -2,14 +2,13 @@ import os
 from shared.runner import TestTraits, Runner
 from shared import const
 
-SCENARIONAME = 'ASP.NET Core MVC App Template'
 EXENAME = 'mvcapptemplate'
 
 
 def main():
     traits = TestTraits(exename=EXENAME,
                         guiapp='false', 
-                        sdk=True,
+                        timeout= f'{const.MINUTE*10}'
                         )
     runner = Runner(traits)
     runner.run()

@@ -193,7 +193,7 @@ def get_process_names_and_process_info(
 ) -> Tuple[ThreadToProcessToName, ProcessInfo]:
     p = get_traced_processes(clr, trace_path, collect_event_names)
     kind = get_trace_kind(trace_path)
-    if kind == TraceKind.Etl:
+    if kind == TraceKind.Etl_or_Btl:
         process = find_process(clr, p.processes, process_predicate)
     else:
         processes = tuple(p.processes)
@@ -224,7 +224,7 @@ def _get_gcs_from_mang(
     mang: AbstractTraceLoadedDotNetRuntime, name: str
 ) -> Sequence[AbstractTraceGC]:
     # Skip the first two GCs which often have incomplete events
-    unfiltered_gcs = mang.GC.GCs[2:]
+    unfiltered_gcs = mang.GC.GCs
 
     def flt(i: int, gc: AbstractTraceGC) -> bool:
         gc_type = GCType(gc.Type)
