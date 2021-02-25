@@ -8,6 +8,7 @@ using System.Collections.Immutable;
 using BenchmarkDotNet.Running;
 using System.IO;
 using BenchmarkDotNet.Extensions;
+using BenchmarkDotNet.Extensions.AotLLVMToolChain;
 
 namespace MicroBenchmarks
 {
@@ -21,6 +22,7 @@ namespace MicroBenchmarks
             List<string> exclusionFilterValue;
             List<string> categoryExclusionFilterValue;
             bool getDiffableDisasm;
+            bool aotLLVM;
 
             // Parse and remove any additional parameters that we need that aren't part of BDN
             try {
@@ -28,7 +30,9 @@ namespace MicroBenchmarks
                 argsList = CommandLineOptions.ParseAndRemoveIntParameter(argsList, "--partition-index", out partitionIndex);
                 argsList = CommandLineOptions.ParseAndRemoveStringsParameter(argsList, "--exclusion-filter", out exclusionFilterValue);
                 argsList = CommandLineOptions.ParseAndRemoveStringsParameter(argsList, "--category-exclusion-filter", out categoryExclusionFilterValue);
+                argsList = CommandLineOptions.ParseAndRemoveStringParameter(argList, "--aotllvm");
                 CommandLineOptions.ParseAndRemoveBooleanParameter(argsList, "--disasm-diff", out getDiffableDisasm);
+
 
                 CommandLineOptions.ValidatePartitionParameters(partitionCount, partitionIndex);
             }
@@ -47,7 +51,8 @@ namespace MicroBenchmarks
                     partitionIndex: partitionIndex,
                     exclusionFilterValue: exclusionFilterValue,
                     categoryExclusionFilterValue: categoryExclusionFilterValue,
-                    getDiffableDisasm: getDiffableDisasm))
+                    getDiffableDisasm: getDiffableDisasm,
+                    aotLLVM))
                 .ToExitCode();
         }
     }

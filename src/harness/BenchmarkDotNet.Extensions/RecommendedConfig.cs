@@ -4,9 +4,11 @@ using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Exporters.Json;
+using BenchmarkDotNet.Toolchains;
 using Perfolizer.Horology;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Reports;
+using BenchmarkDotNet.Extensions.AotLLVM;
 using System.Collections.Generic;
 using Reporting;
 
@@ -22,7 +24,8 @@ namespace BenchmarkDotNet.Extensions
             List<string> exclusionFilterValue = null,
             List<string> categoryExclusionFilterValue = null,
             Job job = null,
-            bool getDiffableDisasm = false)
+            bool getDiffableDisasm = false,
+            bool aotLLVM = false)
         {
             if (job is null)
             {
@@ -35,6 +38,14 @@ namespace BenchmarkDotNet.Extensions
 
                 // See https://github.com/dotnet/roslyn/issues/42393
                 job = job.WithArguments(new Argument[] { new MsBuildArgument("/p:DebugType=portable") });
+            }
+
+
+            if (aotLLVM) {
+                IToolchain toolChain;
+                bool gotToolChain = job.Infrastructure.TryGetToolchain(out toolChain);
+                IBuilder  aotLLVmBuilder = new AotLLVMBuilder( toolChain.Builder );
+                job = job.WithToolchain(new AotLLVMToolChain("aotllvm", toolChain.Generator, aotLLVmBuilder, toolChain.Executor)); 
             }
 
             var config = DefaultConfig.Instance
