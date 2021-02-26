@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System;
+using System.Collections.Immutable;
 using System.IO;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
@@ -27,6 +28,7 @@ namespace BenchmarkDotNet.Extensions
             bool getDiffableDisasm = false,
             bool aotLLVM = false)
         {
+           
             if (job is null)
             {
                 job = Job.Default
@@ -42,10 +44,15 @@ namespace BenchmarkDotNet.Extensions
 
 
             if (aotLLVM) {
-                IToolchain toolChain;
-                bool gotToolChain = job.Infrastructure.TryGetToolchain(out toolChain);
-                IBuilder  aotLLVmBuilder = new AotLLVMBuilder( toolChain.Builder );
-                job = job.WithToolchain(new AotLLVMToolChain("aotllvm", toolChain.Generator, aotLLVmBuilder, toolChain.Executor)); 
+                IToolchain toolchain;
+                bool gotToolChain = job.Infrastructure.TryGetToolchain(out toolchain);
+                
+                if (!gotToolChain) {
+                    toolchain = default(Toolchain);
+                }
+
+                IBuilder  aotLLVmBuilder = new AotLLVMBuilder( toolchain.Builder );
+                job = job.WithToolchain(new AotLLVMToolChain("aotllvm", toolchain.Generator, aotLLVmBuilder, toolchain.Executor)); 
             }
 
             var config = DefaultConfig.Instance
@@ -73,6 +80,7 @@ namespace BenchmarkDotNet.Extensions
                 config = config.AddDiagnoser(CreateDisassembler());
             }
 
+            Console.WriteLine("Got here.");
             return config;
         }
 

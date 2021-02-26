@@ -30,7 +30,7 @@ namespace BenchmarkDotNet.Extensions.AotLLVM
 
 	    public void PreCompile(string programName, string projectRoot)
 	    {
-		    Console.WriteLine("Got to here.\n");
+		    Console.WriteLine("Got to precompile.\n");
 	    } 
 
         
